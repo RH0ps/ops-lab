@@ -1,0 +1,9 @@
+# =========================
+# disk monitoring (state-based)
+# =========================
+*/5 * * * * /home/r.h/docker/disk_monitor.sh
+
+# =========================
+# backup system
+# =========================
+0 9 * * * /home/r.h/docker/backup.sh
