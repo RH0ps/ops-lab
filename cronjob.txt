@@ -1,9 +1,3 @@
-# =========================
-# disk monitoring (state-based)
-# =========================
-*/5 * * * * /home/r.h/docker/disk_monitor.sh
+*/5 * * * * runuser -u r.h -- /home/r.h/docker/disk_monitor.sh >> /home/r.h/docker/cron.log 2>&1
 
-# =========================
-# backup system
-# =========================
-0 9 * * * /home/r.h/docker/backup.sh
+0 9 * * * runuser -u r.h -- /home/r.h/docker/backup.sh >> /home/r.h/docker/cron.log 2>&1
