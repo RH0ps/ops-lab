@@ -8,3 +8,35 @@ services:
 
     stdin_open: true
     tty: true
+
+    # コンテナ自動復旧（運用前提）
+    restart: unless-stopped
+
+    # 環境変数（Slack webhook / DRY_RUNなど）
+    env_file:
+      - .env
+
+    # タイムゾーン明示
+    environment:
+      - TZ=Asia/Tokyo
+
+    # 実行ディレクトリ固定（cron・bash事故防止）
+    working_dir: /home/r.h
+
+    volumes:
+      # スクリプト群（読み取り専用＝事故防止）
+      - ./docker:/home/r.h/docker:ro
+
+      # ログ分離（ホストとコンテナ構造を一致させる）
+      - ./logs/monitor:/var/log/ops-lab/monitor
+      - ./logs/backup:/var/log/ops-lab/backup
+      - ./logs/cron:/var/log/ops-lab/cron
+
+    # cron死活監視（軽量・安定優先）
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep cron"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      
