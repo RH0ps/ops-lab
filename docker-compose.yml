@@ -1,0 +1,10 @@
+services:
+  ops-lab:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: ops-lab
+
+    stdin_open: true
+    tty: true
