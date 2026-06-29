@@ -141,11 +141,16 @@ cron環境で動作することを前提に、
 
 各ファイルの役割
 
-* [01_env.example: 環境設定例](./01_env.example)
-* [02_cronjob.txt: cron自動実行設定](./02_cronjob.txt)
-* [03_disk_monitor.sh: ディスク監視スクリプト](./03_disk_monitor.sh)
-* [04_backup.sh: バックアップ自動化スクリプト](./04_backup.sh)
-* [05_index.html: バックアップ検証対象](./05_index.html)
+* [README.md: プロジェクト全体の設計思想・構成・目的の説明](./README.md)
+* [docker-compose.yml: コンテナ起動・環境再現用の構成ファイル](./docker-compose.yml)
+* [Dockerfile: Ubuntuベースの実行環境構築定義（cron・ツール・ユーザー設定）](./Dockerfile)
+* [entrypoint.sh: コンテナ起動時にcron登録とデーモン起動を行うスクリプト](./entrypoint.sh)
+* [cronjob.txt: cronによる定期実行スケジュール定義](./cronjob.txt)
+* [env.example: 環境変数テンプレート（Slack Webhookなどの設定管理）](./env.example)
+* [disk_monitor.sh: ディスク使用率監視スクリプト（状態管理型アラート）](./disk_monitor.sh)
+* [backup.sh: 定期バックアップスクリプト（世代管理・通知付き）](./backup.sh)
+* [index.html: バックアップ動作確認用のテストHTMLファイル](./index.html)
+* [.gitignore: ログ・環境変数などの非管理対象ファイル定義](./.gitignore)
 
 ---
 
