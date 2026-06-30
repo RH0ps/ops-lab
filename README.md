@@ -32,6 +32,7 @@ Bash、cron、Dockerを利用し、
 
 ## Architecture
 ```bash
+# インフラ構築レイヤー
 Dockerfile
  |
  +-- Ubuntu 24.04ベース環境
@@ -43,21 +44,16 @@ Dockerfile
  +-- スクリプト一括配置（docker/配下）
  +-- entrypointでcron登録 + 起動制御
 
----
-
 docker-compose
  |
  +-- コンテナ起動
-
----
 
 entrypoint.sh
  |
  +-- crontab登録
  +-- cronデーモン起動（cron -f）
 
----
-
+# 自動運用レイヤー
 cron
  |
  +-- disk_monitor.sh
@@ -76,9 +72,8 @@ cron
          +-- backup.log出力
          +-- エラー時Slack通知
 
----
-
-ops_cli.sh（運用CLIレイヤー）
+＃手動運用レイヤー
+ops_cli.sh
  |
  +-- Docker操作の統合（up/down/restart/rebuild）
  +-- コンテナ接続ショートカット（back / shell）
