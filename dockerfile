@@ -9,6 +9,7 @@ RUN apt update && apt install -y --no-install-recommends \
     curl \
     git \
     cron \
+    ca-certificates \
     tzdata \
     jq \
     && rm -rf /var/lib/apt/lists/*

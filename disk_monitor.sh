@@ -13,7 +13,7 @@ export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 USAGE=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
 
 STATE_FILE="/tmp/disk_state.txt"
-LOG_FILE="$HOME/docker/monitor.log"
+LOG_FILE="/home/r.h/docker/monitor.log"
 
 prev_state="UNKNOWN"
 

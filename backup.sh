@@ -6,8 +6,8 @@ set -euo pipefail
 # =========================
 
 TARGET_FILE="/home/r.h/docker/index.html"
-BACKUP_DIR="/home/r.h/docker/backup"
-LOG_FILE="/home/r.h/docker/backup/backup.log"
+BACKUP_DIR="/home/r.h/backup"
+LOG_FILE="/home/r.h/backup/backup.log"
 
 if [ -f "/home/r.h/docker/.env" ]; then
     source "/home/r.h/docker/.env"

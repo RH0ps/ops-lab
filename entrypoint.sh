@@ -1,6 +1,4 @@
 #!/bin/bash
-set -e
-
-crontab /home/r.h/docker/cronjob.txt
-
+crontab -u r.h /tmp/cronjob.txt
 exec cron -f
+
