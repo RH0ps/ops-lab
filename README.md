@@ -72,7 +72,7 @@ cron
          +-- backup.log出力
          +-- エラー時Slack通知
 
-＃手動運用レイヤー
+# 手動運用レイヤー
 ops_cli.sh
  |
  +-- Docker操作の統合（up/down/restart/rebuild）
@@ -217,7 +217,7 @@ DockerfileとDocker Composeを利用し、
 - IaCによるインフラ構築
 - メトリクス可視化
 - より実運用に近いアラート設計
-- CLI（ops_cli.sh）の拡張による運用自動化の更なる統合
+- ops_cli.sh を中心とした運用自動化のさらなる統合
 
 ---
 
