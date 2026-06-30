@@ -17,7 +17,7 @@ Bash、cron、Dockerを利用し、
 
 ## Overview
 
-実装内容:
+実装内容
 
 - ディスク使用率監視
 - 状態管理型アラート通知
@@ -26,6 +26,7 @@ Bash、cron、Dockerを利用し、
 - cronによるスケジュール駆動型実行（5分間隔 / 毎日9時）
 - ログ管理
 - Dockerによる実行環境構築
+- ops_cli.sh による運用CLI管理（Docker操作・監視・ログ・Git操作の統合）
 
 ---
 
@@ -42,19 +43,20 @@ Dockerfile
  +-- スクリプト一括配置（docker/配下）
  +-- entrypointでcron登録 + 起動制御
 
-        ↓
+---
 
 docker-compose
  |
  +-- コンテナ起動
-         ↓
+
+---
 
 entrypoint.sh
  |
  +-- crontab登録
  +-- cronデーモン起動（cron -f）
 
-        ↓
+---
 
 cron
  |
@@ -73,6 +75,17 @@ cron
          +-- 世代管理
          +-- backup.log出力
          +-- エラー時Slack通知
+
+---
+
+ops_cli.sh（運用CLIレイヤー）
+ |
+ +-- Docker操作の統合（up/down/restart/rebuild）
+ +-- コンテナ接続ショートカット（back / shell）
+ +-- 監視コマンド統合（status / health / logs）
+ +-- バックアップ・ディスク監視実行
+ +-- Git操作統合（pull / repo確認）
+ +-- デバッグ・診断機能（ops_diagnose / ops_fix）
 ```
 
 ---
@@ -150,6 +163,7 @@ cron環境で動作することを前提に、
 * [disk_monitor.sh: ディスク使用率監視スクリプト（状態管理型アラート）](./disk_monitor.sh)
 * [backup.sh: 定期バックアップスクリプト（世代管理・通知付き）](./backup.sh)
 * [index.html: バックアップ動作確認用のテストHTMLファイル](./index.html)
+* [ops_cli.sh: Docker操作・監視・バックアップ・Git管理・診断機能を統合した運用CLI（ops-labの操作インターフェース層）](./ops_cli.sh)
 * [.gitignore: ログ・環境変数などの非管理対象ファイル定義](./.gitignore)
 
 ---
@@ -208,6 +222,7 @@ DockerfileとDocker Composeを利用し、
 - IaCによるインフラ構築
 - メトリクス可視化
 - より実運用に近いアラート設計
+- CLI（ops_cli.sh）の拡張による運用自動化の更なる統合
 
 ---
 
