@@ -1,3 +1,5 @@
 monitor.log
 backup.log
 .env
+echo ".DS_Store" >> .gitignore
+
