@@ -1,4 +1,9 @@
 #!/bin/bash
-crontab -u r.h /tmp/cronjob.txt
-exec cron -f
+set -e
+
+echo "[BOOT] starting cron"
+
+crontab /home/r.h/docker/cronjob.txt
+
+cron -f
 

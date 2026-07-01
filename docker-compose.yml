@@ -12,27 +12,22 @@ services:
     restart: unless-stopped
 
     env_file:
-      - ./docker/.env
+      - ./.env
 
     environment:
-      - TZ=Asia/Tokyo
+      TZ: Asia/Tokyo
 
     working_dir: /home/r.h
 
+    entrypoint: ["/home/r.h/docker/entrypoint.sh"]
+
     volumes:
-     # スクリプトだけ
-     - ./docker:/home/r.h/docker:ro
-
-     # バックアップ保存
-     - ./backup:/home/r.h/backup
-
-     # ログ分離
-     - ./logs/monitor:/var/log/ops-lab/monitor
-     - ./logs/backup:/var/log/ops-lab/backup
-     - ./logs/cron:/var/log/ops-lab/cron
+      - ./logs:/home/r.h/docker/logs
+      - ./state:/home/r.h/docker/state
+      - ./metrics:/home/r.h/docker/metrics
 
     healthcheck:
-      test: ["CMD-SHELL", "pgrep cron"]
+      test: ["CMD-SHELL", "pgrep cron >/dev/null 2>&1"]
       interval: 30s
       timeout: 5s
       retries: 3
