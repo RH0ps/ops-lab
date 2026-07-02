@@ -1,1 +1,0 @@
-node_disk_usage_percentage{mountpoint="/"} 2
