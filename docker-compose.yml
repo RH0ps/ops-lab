@@ -25,6 +25,7 @@ services:
       - ./logs:/home/r.h/docker/logs
       - ./state:/home/r.h/docker/state
       - ./metrics:/home/r.h/docker/metrics
+      - ./backup:/home/r.h/backup
 
     healthcheck:
       test: ["CMD-SHELL", "pgrep cron >/dev/null 2>&1"]
