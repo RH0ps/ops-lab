@@ -116,7 +116,18 @@ echo "$(date "+%F %T") [INFO] usage=${USAGE}% state=${state}" >> "$LOG_FILE"
 # ------------------------------------------------------------------------------
 
 METRIC_TMP="$(mktemp 2>/dev/null || echo "/tmp/metric.$$")"
-echo "node_disk_usage_percentage{mountpoint=\"/\"} $USAGE" > "$METRIC_TMP"
+
+if [[ "$state" == "OK" ]]; then
+    STATUS=0
+elif [[ "$state" == "WARN" ]]; then
+    STATUS=1
+else
+    STATUS=2
+fi
+
+echo "disk_usage_percent $USAGE" > "$METRIC_TMP"
+echo "disk_status $STATUS" >> "$METRIC_TMP"
+
 mv "$METRIC_TMP" "$METRIC_FILE" 2>/dev/null || true
 
 # ------------------------------------------------------------------------------

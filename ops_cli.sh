@@ -4,11 +4,10 @@
 # ops-lab management CLI (ULTIMATE FINAL PRO)
 # =========================
 
-OPS_DIR="$HOME/study"
-OPS_COMPOSE="$OPS_DIR/docker-compose.yml"
+OPS_REPO="$HOME/study/github/ops-lab"
+OPS_COMPOSE="$OPS_REPO/docker-compose.yml"
 OPS_SERVICE="ops-lab"
 OPS_SCRIPT="/home/r.h/docker"
-OPS_REPO="$HOME/study/github/ops-lab"
 
 # =========================
 # internal helpers
@@ -216,7 +215,7 @@ ops_disk(){
 }
 
 ops_backup_ls(){
-  ls -lh "$OPS_DIR/backup" 2>/dev/null || echo "no backup dir"
+  ls -lh "$OPS_REPO/backup" 2>/dev/null || echo "no backup dir"
 }
 
 # =========================

@@ -7,7 +7,10 @@ set -euo pipefail
 
 TARGET_FILE="/home/r.h/docker/index.html"
 BACKUP_DIR="/home/r.h/backup"
-LOG_FILE="/home/r.h/backup/backup.log"
+LOG_FILE="/home/r.h/docker/logs/backup.log"
+METRIC_FILE="/home/r.h/docker/metrics/backup.prom"
+SUCCESS_FILE="/home/r.h/docker/state/backup_success_count"
+FAILURE_FILE="/home/r.h/docker/state/backup_failure_count"
 
 if [ -f "/home/r.h/docker/.env" ]; then
     source "/home/r.h/docker/.env"
@@ -47,7 +50,16 @@ notify() {
 # trap（エラー検知）
 # =========================
 
-trap 'log "ERROR: script failed (exit code=$?, line=$LINENO)"; notify "❌ Backup failed"' ERR
+trap '
+EXIT_CODE=$?
+
+FAILURE_COUNT=$(cat "$FAILURE_FILE")
+FAILURE_COUNT=$((FAILURE_COUNT + 1))
+echo "$FAILURE_COUNT" > "$FAILURE_FILE"
+
+log "ERROR: script failed (exit code=$EXIT_CODE, line=$LINENO)"
+notify "❌ Backup failed"
+' ERR
 
 # =========================
 # DRY RUN
@@ -63,6 +75,12 @@ fi
 # =========================
 
 mkdir -p "$BACKUP_DIR"
+mkdir -p "$(dirname "$LOG_FILE")"
+mkdir -p "$(dirname "$METRIC_FILE")"
+mkdir -p "$(dirname "$SUCCESS_FILE")"
+
+[ -f "$SUCCESS_FILE" ] || echo 0 > "$SUCCESS_FILE"
+[ -f "$FAILURE_FILE" ] || echo 0 > "$FAILURE_FILE"
 
 DATE=$(date "+%Y%m%d_%H%M%S")
 BACKUP_FILE="index_${DATE}.html"
@@ -115,5 +133,20 @@ fi
 # 成功通知
 # =========================
 
+SUCCESS_COUNT=$(cat "$SUCCESS_FILE")
+SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+echo "$SUCCESS_COUNT" > "$SUCCESS_FILE"
+
+FAILURE_COUNT=$(cat "$FAILURE_FILE")
+
+{
+    echo "backup_success_total $SUCCESS_COUNT"
+    echo "backup_failure_total $FAILURE_COUNT"
+    echo "backup_last_timestamp $(date +%s)"
+} > "$METRIC_FILE"
+
 log "Backup success: $BACKUP_FILE"
 notify "📦 Backup success: $BACKUP_FILE ($(date '+%Y-%m-%d %H:%M:%S'))"
+
+exit 0
+
