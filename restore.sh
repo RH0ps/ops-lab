@@ -97,15 +97,25 @@ if [ -n "$TARGET_BACKUP" ]; then
         LATEST="$BACKUP_DIR/$TARGET_BACKUP"
     fi
 else
-    LATEST=$(ls -1t "$BACKUP_DIR"/index_*.html 2>/dev/null | head -1)
+    LATEST=$(ls -1 "$BACKUP_DIR"/index_*.html 2>/dev/null | sort | tail -1)
 fi
 
 # =========================
 # 古すぎるバックアップ拒否
+# （ファイル名の日時で判定）
 # =========================
 
 if [ -f "$LATEST" ]; then
-    AGE=$(($(date +%s) - $(stat -c %Y "$LATEST" 2>/dev/null || echo 0)))
+    FILE_NAME=$(basename "$LATEST")
+
+    # index_20260706_092702.html → 20260706092702
+    FILE_DATE=$(echo "$FILE_NAME" | sed -E 's/index_([0-9]{8})_([0-9]{6})\.html/\1\2/')
+
+    BACKUP_TIME=$(date -d \
+        "${FILE_DATE:0:4}-${FILE_DATE:4:2}-${FILE_DATE:6:2} ${FILE_DATE:8:2}:${FILE_DATE:10:2}:${FILE_DATE:12:2}" \
+        +%s)
+
+    AGE=$(( $(date +%s) - BACKUP_TIME ))
 
     if [ "$AGE" -gt "$MAX_AGE_SEC" ]; then
         log "Backup too old: $LATEST"
