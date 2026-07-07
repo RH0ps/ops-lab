@@ -1,0 +1,25 @@
+#!/bin/bash
+
+ops_help(){
+  echo "ops-lab CLI"
+  echo "back / ops_shell        : コンテナに入る"
+  echo "ops_force_shell         : shell強制起動"
+  echo "ops_up / ops_down       : 起動 / 停止"
+  echo "ops_restart             : 再起動"
+  echo "ops_rebuild             : 再構築"
+  echo "ops_update              : git pull + restart"
+  echo "ops_logs [service]      : ログ"
+  echo "ops_status              : 状態一覧"
+  echo "ops_health              : health"
+  echo "ops_cron                : cron"
+  echo "ops_exec [cmd]          : 実行"
+  echo "ops_cat [path]          : ファイル閲覧"
+  echo "ops_backup / ops_disk   : scripts"
+  echo "ops_prune / ops_clean   : docker掃除"
+  echo "ops_top                 : リソース監視"
+  echo "ops_stats               : 全体stats"
+  echo "ops_errors              : error抽出"
+  echo "ops_fix                 : 自動復旧"
+  echo "ops_diagnose            : 総合診断"
+  echo "ops_info                : サマリー"
+}
