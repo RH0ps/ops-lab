@@ -33,3 +33,85 @@ ops_disk(){
 ops_backup_ls(){
   ls -lh "$OPS_REPO/backup" 2>/dev/null || echo "no backup dir"
 }
+
+ops_check_all(){
+
+  local PASS=0
+  local FAIL=0
+  
+  echo "===== Container ====="
+  ops_ps
+
+  echo
+  echo "===== Health ====="
+  ops_health
+
+  echo
+  echo "===== Backup ====="
+  ops_backup
+
+  echo
+  echo "===== Disk Monitor ====="
+  ops_disk
+
+  echo
+  echo "===== Restore Script ====="
+
+  local CID
+  CID=$(ops_check) || return 1
+
+  if docker exec "$CID" test -f "$OPS_SCRIPT/restore.sh"; then
+    echo "OK - restore.sh exists"
+    ((PASS++))
+   else
+    echo "NG - restore.sh not found"
+    ((FAIL++))
+fi
+
+  echo
+  echo "===== Backup Directory ====="
+
+  if docker exec "$CID" test -d "$OPS_SCRIPT/backup"; then
+    echo "OK - backup directory exists"
+    ((PASS++))
+  else
+    echo "NG - backup directory not found"
+    ((FAIL++))
+  fi
+
+  echo
+  echo "===== Metrics Directory ====="
+
+  if docker exec "$CID" test -d "$OPS_SCRIPT/metrics"; then
+    echo "OK - metrics directory exists"
+    ((PASS++))
+  else
+    echo "NG - metrics directory not found"
+    ((FAIL++))
+  fi
+
+  echo
+  echo "===== Logs Directory ====="
+
+  if docker exec "$CID" test -d "$OPS_SCRIPT/logs"; then
+    echo "OK - logs directory exists"
+    ((PASS++))
+  else
+    echo "NG - logs directory not found"
+    ((FAIL++))
+  fi
+
+echo
+echo "===== Summary ====="
+
+echo "PASS : $PASS"
+echo "FAIL : $FAIL"
+
+if (( FAIL == 0 )); then
+    echo
+    echo "System Status : HEALTHY"
+else
+    echo
+    echo "System Status : FAILED"
+fi
+}
