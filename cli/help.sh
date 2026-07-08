@@ -22,4 +22,5 @@ ops_help(){
   echo "ops_fix                 : 自動復旧"
   echo "ops_diagnose            : 総合診断"
   echo "ops_info                : サマリー"
+  echo "ops_check_all           : 総合ヘルスチェック"
 }
