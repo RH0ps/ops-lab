@@ -1,0 +1,103 @@
+#!/bin/bash
+
+SCRIPT="$(readlink "$0")"
+
+if [[ -z "$SCRIPT" ]]; then
+    SCRIPT="$0"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
+
+source "$SCRIPT_DIR/ops_cli.sh"
+
+case "$1" in
+  help)
+    ops_help
+    ;;
+  back)
+    ops_force_shell
+    ;;
+  up)
+    ops_up
+    ;;
+  down)
+    ops_down
+    ;;
+  restart)
+    ops_restart
+    ;;
+  rebuild)
+    ops_rebuild
+    ;;
+  update)
+    ops_update
+    ;;
+  status)
+    ops_status
+    ;;
+  health)
+    ops_health
+    ;;
+  cron)
+    ops_cron
+    ;;
+  logs)
+    shift
+    ops_logs "$@"
+    ;;
+  exec)
+    shift
+    ops_exec "$@"
+    ;;
+  cat)
+    shift
+    ops_cat "$@"
+    ;;
+  backup)
+    ops_backup
+    ;;
+  disk)
+    ops_disk
+    ;;
+  prune)
+    ops_prune
+    ;;
+  clean)
+    ops_clean
+    ;;
+  top)
+    ops_top
+    ;;
+  stats)
+    ops_stats
+    ;;
+  errors)
+    ops_errors
+    ;;
+  fix)
+    ops_fix
+    ;;
+  diagnose)
+    ops_diagnose
+    ;;
+  info)
+    ops_info
+    ;;
+  check-all)
+    ops_check_all
+    ;;
+  git)
+    ops_git
+    ;;
+  pull)
+    ops_pull
+    ;;
+  config)
+    ops_config
+    ;;
+  *)
+    echo "Unknown command: $1"
+    echo "Run 'ops help' for usage."
+    ;;
+esac
+
