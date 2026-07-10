@@ -10,6 +10,37 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
 
 source "$SCRIPT_DIR/ops_cli.sh"
 
+COMMANDS=(
+  help
+  version
+  back
+  up
+  down
+  restart
+  rebuild
+  update
+  status
+  health
+  cron
+  logs
+  exec
+  cat
+  backup
+  disk
+  prune
+  clean
+  top
+  stats
+  errors
+  fix
+  diagnose
+  info
+  check-all
+  git
+  pull
+  config
+)
+
 case "$1" in
   help)
     ops_help
@@ -95,8 +126,30 @@ case "$1" in
   config)
     ops_config
     ;;
+  version)
+    ops_version
+    ;;
   *)
     echo "Unknown command: $1"
+    FOUND=0
+
+for cmd in "${COMMANDS[@]}"; do
+    if [[ "$cmd" == "$1"* ]]; then
+        echo
+        echo "Did you mean:"
+        echo "  $cmd"
+        FOUND=1
+        break
+    fi
+done
+    echo
+    echo "Available commands:"
+
+    for cmd in "${COMMANDS[@]}"; do
+        echo "  $cmd"
+    done
+
+    echo
     echo "Run 'ops help' for usage."
     ;;
 esac

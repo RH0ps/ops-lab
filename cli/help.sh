@@ -28,4 +28,5 @@ ops_help(){
   echo "git                 : git status"
   echo "pull                : git pull"
   echo "config              : docker compose設定表示"
+  echo "version             : CLIバージョン表示"
 }
