@@ -11,3 +11,5 @@ source "$CLI_DIR/docker.sh"
 source "$CLI_DIR/git.sh"
 source "$CLI_DIR/diagnose.sh"
 source "$CLI_DIR/help.sh"
+source "$CLI_DIR/version.sh"
+
