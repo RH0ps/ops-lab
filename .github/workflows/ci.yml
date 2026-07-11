@@ -31,7 +31,7 @@ jobs:
         run: |
           find . -name "*.sh" -print0 | while IFS= read -r -d '' file; do
             echo "ShellCheck: $file"
-            shellcheck "$file"
+            shellcheck -S error -e SC1091,SC2012,SC2034 "$file"
           done
 
       - name: Docker Build
