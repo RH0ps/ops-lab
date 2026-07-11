@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Bash Syntax Check
+        run: |
+          find . -name "*.sh" -print0 | while IFS= read -r -d '' file; do
+            echo "Checking syntax: $file"
+            bash -n "$file"
+          done
+
+      - name: ShellCheck
+        run: |
+          find . -name "*.sh" -print0 | while IFS= read -r -d '' file; do
+            echo "ShellCheck: $file"
+            shellcheck "$file"
+          done
+
+      - name: Docker Build
+        run: |
+          docker build -t ops-lab .
+
