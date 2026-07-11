@@ -248,4 +248,8 @@ log "Restore file size: $(stat -f%z "$TARGET_FILE" 2>/dev/null || stat -c%s "$TA
 log "Restore completed: $(basename "$LATEST")"
 notify "♻️ Restore completed: $(basename "$LATEST")"
 
+if [[ -f "/home/r.h/docker/.env" ]]; then
+    source "/home/r.h/docker/.env"
+fi
+
 exit 0
