@@ -13,3 +13,5 @@ backup/
 # Log files
 *.log
 
+backup_snapshots/
+*.rollback
