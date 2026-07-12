@@ -111,9 +111,15 @@ if [ -f "$LATEST" ]; then
     # index_20260706_092702.html → 20260706092702
     FILE_DATE=$(echo "$FILE_NAME" | sed -E 's/index_([0-9]{8})_([0-9]{6})\.html/\1\2/')
 
-    BACKUP_TIME=$(date -d \
-        "${FILE_DATE:0:4}-${FILE_DATE:4:2}-${FILE_DATE:6:2} ${FILE_DATE:8:2}:${FILE_DATE:10:2}:${FILE_DATE:12:2}" \
-        +%s)
+    # GNU & BSD 両対応
+    if date -d "2020-01-01" +%s >/dev/null 2>&1; then
+
+    BACKUP_TIME=$(date -d "$year-$month-$day $hour:$min:$sec" +%s)
+    else
+
+    # macOS: date -j
+    BACKUP_TIME=$(date -j -f "%Y%m%d%H%M%S" "${FILE_DATE}" +%s)
+fi
 
     AGE=$(( $(date +%s) - BACKUP_TIME ))
 
@@ -138,8 +144,9 @@ fi
 # 安全チェック
 # =========================
 
-if [[ "$LATEST" == *".."* ]] || [[ "$LATEST" == *"~"* ]]; then
-    log "Invalid backup path detected: $LATEST"
+# LATEST が BACKUP_DIR 配下か確認
+if [[ ! "$LATEST" == "$BACKUP_DIR"/* ]]; then
+    log "ERROR: Path outside backup directory"
     notify "❌ Restore blocked: invalid path"
     exit 1
 fi
