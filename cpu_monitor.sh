@@ -125,8 +125,8 @@ else
     STATUS=2
 fi
 
-echo "disk_usage_percent $USAGE" > "$METRIC_TMP"
-echo "disk_status $STATUS" >> "$METRIC_TMP"
+echo "cpu_usage_percent $USAGE" > "$METRIC_TMP"
+echo "cpu_status $STATUS" >> "$METRIC_TMP"
 
 mv "$METRIC_TMP" "$METRIC_FILE" 2>/dev/null || true
 
