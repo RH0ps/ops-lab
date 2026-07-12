@@ -14,7 +14,7 @@ HISTORY_FILE="/home/r.h/docker/logs/restore_history.log"
 COUNT_FILE="/home/r.h/docker/state/restore_count"
 
 SNAPSHOT_DIR="/home/r.h/docker/backup_snapshots"
-JSON_LOG="/home/r.h/docker/logs/restore_history.json"
+JSON_LOG="/home/r.h/docker/logs/restore_history.jsonl"
 
 LOCK_FILE="/tmp/restore.lock"
 MAX_AGE_SEC=$((60*60*24*7))  # 7日
@@ -28,23 +28,61 @@ WEBHOOK_URL="${WEBHOOK_URL:?WEBHOOK_URL is required}"
 FORCE="${FORCE:-false}"
 
 # =========================
+# 依存コマンド確認 (macOS / Linux 共通)
+# =========================
+
+# 【修正①】ログディレクトリ作成前に実行されるため、標準エラー出力へ直接出力して安全に exit する
+command -v flock >/dev/null 2>&1 || {
+    echo "ERROR: flock command not found. (Required for lock mechanism)" >&2
+    exit 1
+}
+
+command -v jq >/dev/null 2>&1 || {
+    echo "ERROR: jq command not found." >&2
+    exit 1
+}
+
+command -v curl >/dev/null 2>&1 || {
+    echo "ERROR: curl command not found." >&2
+    exit 1
+}
+
+# =========================
+# 互換関数定義
+# =========================
+
+# macOS / Linux 共通のハッシュ計算関数
+hash_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+# ログ関数
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
+}
+
+# =========================
+# 準備（ディレクトリ作成）
+# =========================
+
+mkdir -p "$(dirname "$LOG_FILE")"
+mkdir -p "$SNAPSHOT_DIR"
+mkdir -p "$(dirname "$COUNT_FILE")"
+mkdir -p "$(dirname "$JSON_LOG")"
+
+# =========================
 # ロック（多重実行防止）
 # =========================
 
-if [ -f "$LOCK_FILE" ]; then
-    echo "Restore already running"
-    exit 1
-fi
+exec 9>"$LOCK_FILE"
 
-touch "$LOCK_FILE"
-trap 'rm -f "$LOCK_FILE"' EXIT
-
-# =========================
-# ログ関数
-# =========================
-
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
+flock -n 9 || {
+    log "Restore already running"
+    exit 0
 }
 
 # =========================
@@ -54,10 +92,16 @@ log() {
 notify() {
     local message="$1"
 
-    curl -s -X POST \
+    if ! curl -sS \
+        --max-time 5 \
+        -X POST \
         -H "Content-type: application/json" \
         --data "$(jq -n --arg text "$message" '{text:$text}')" \
-        "$WEBHOOK_URL" >/dev/null
+        "$WEBHOOK_URL" >/dev/null 2>&1
+    then
+        log "Slack notification failed"
+        return 1
+    fi
 }
 
 # =========================
@@ -70,18 +114,11 @@ if [ "${DRY_RUN:-false}" = "true" ]; then
 fi
 
 # =========================
-# 準備
-# =========================
-
-mkdir -p "$(dirname "$LOG_FILE")"
-mkdir -p "$SNAPSHOT_DIR"
-
-# =========================
 # バックアップ一覧
 # =========================
 
 echo "===== backup list ====="
-ls -1t "$BACKUP_DIR"/index_*.html 2>/dev/null || true
+find "$BACKUP_DIR" -maxdepth 1 -name "index_*.html" -type f 2>/dev/null | sort -r || true
 echo "======================="
 
 # =========================
@@ -97,7 +134,31 @@ if [ -n "$TARGET_BACKUP" ]; then
         LATEST="$BACKUP_DIR/$TARGET_BACKUP"
     fi
 else
-    LATEST=$(ls -1 "$BACKUP_DIR"/index_*.html 2>/dev/null | sort | tail -1)
+    LATEST=$(
+        find "$BACKUP_DIR" -maxdepth 1 -name "index_*.html" -type f 2>/dev/null | sort | tail -1 || true
+    )
+fi
+
+# =========================
+# 安全チェック
+# =========================
+
+if [ -z "${LATEST:-}" ] || [ ! -f "$LATEST" ]; then
+    log "No backup found"
+    notify "❌ Restore failed: no backup"
+    exit 1
+fi
+
+if [[ ! "$LATEST" == "$BACKUP_DIR"/* ]]; then
+    log "ERROR: Path outside backup directory"
+    notify "❌ Restore blocked: invalid path"
+    exit 1
+fi
+
+if [ ! -s "$LATEST" ]; then
+    log "Invalid backup: $LATEST"
+    notify "❌ Restore failed: invalid backup"
+    exit 1
 fi
 
 # =========================
@@ -105,23 +166,18 @@ fi
 # （ファイル名の日時で判定）
 # =========================
 
-if [ -f "$LATEST" ]; then
-    FILE_NAME=$(basename "$LATEST")
+FILE_NAME=$(basename "$LATEST")
 
-    # index_20260706_092702.html → 20260706092702
+if [[ "$FILE_NAME" =~ ^index_[0-9]{8}_[0-9]{6}\.html$ ]]; then
     FILE_DATE=$(echo "$FILE_NAME" | sed -E 's/index_([0-9]{8})_([0-9]{6})\.html/\1\2/')
 
     if date -d "2020-01-01" +%s >/dev/null 2>&1; then
-    # GNU date: extract from FILE_DATE (YYYYMMDDHHMMSS)
-    BACKUP_TIME=$(date -d "${FILE_DATE:0:4}-${FILE_DATE:4:2}-${FILE_DATE:6:2} ${FILE_DATE:8:2}:${FILE_DATE:10:2}:${FILE_DATE:12:2}" +%s)
+        BACKUP_TIME=$(date -d \
+            "${FILE_DATE:0:4}-${FILE_DATE:4:2}-${FILE_DATE:6:2} ${FILE_DATE:8:2}:${FILE_DATE:10:2}:${FILE_DATE:12:2}" \
+            +%s)
     else
-    # macOS: BSD date
-    BACKUP_TIME=$(date -j -f "%Y%m%d%H%M%S" "${FILE_DATE}" +%s)
+        BACKUP_TIME=$(date -j -f "%Y%m%d%H%M%S" "$FILE_DATE" +%s)
     fi
-
-    # macOS: date -j
-    BACKUP_TIME=$(date -j -f "%Y%m%d%H%M%S" "${FILE_DATE}" +%s)
-fi
 
     AGE=$(( $(date +%s) - BACKUP_TIME ))
 
@@ -130,6 +186,10 @@ fi
         notify "⚠️ Restore blocked: backup too old"
         exit 1
     fi
+else
+    log "Invalid backup filename format: $FILE_NAME"
+    notify "❌ Restore blocked: invalid backup filename format"
+    exit 1
 fi
 
 # =========================
@@ -143,33 +203,10 @@ if [ -f "$TARGET_FILE" ]; then
 fi
 
 # =========================
-# 安全チェック
-# =========================
-
-# LATEST が BACKUP_DIR 配下か確認
-if [[ ! "$LATEST" == "$BACKUP_DIR"/* ]]; then
-    log "ERROR: Path outside backup directory"
-    notify "❌ Restore blocked: invalid path"
-    exit 1
-fi
-
-if [ -z "${LATEST:-}" ] || [ ! -f "$LATEST" ]; then
-    log "No backup found"
-    notify "❌ Restore failed: no backup"
-    exit 1
-fi
-
-if [ ! -s "$LATEST" ]; then
-    log "Invalid backup: $LATEST"
-    notify "❌ Restore failed: invalid backup"
-    exit 1
-fi
-
-# =========================
 # SHA256チェック
 # =========================
 
-BACKUP_HASH=$(sha256sum "$LATEST" | awk '{print $1}')
+BACKUP_HASH=$(hash_file "$LATEST")
 
 # =========================
 # diff確認
@@ -205,8 +242,6 @@ if [ -f "$TARGET_FILE" ]; then
     log "Rollback saved"
 fi
 
-ROLLBACK_HASH=$(sha256sum "$ROLLBACK_FILE" 2>/dev/null | awk '{print $1}')
-
 # =========================
 # 復元実行
 # =========================
@@ -217,11 +252,16 @@ cp -a "$LATEST" "$TARGET_FILE"
 # 自動ロールバック検証
 # =========================
 
-RESTORED_HASH=$(sha256sum "$TARGET_FILE" | awk '{print $1}')
+RESTORED_HASH=$(hash_file "$TARGET_FILE")
 
 if [ "$RESTORED_HASH" != "$BACKUP_HASH" ]; then
     log "Hash mismatch detected, rollback triggered"
-    cp -a "$ROLLBACK_FILE" "$TARGET_FILE"
+    # 【修正②】ロールバックファイルが存在する場合のみ安全に cp を実行する
+    if [ -f "$ROLLBACK_FILE" ]; then
+        cp -a "$ROLLBACK_FILE" "$TARGET_FILE"
+    else
+        log "Rollback skipped: rollback file does not exist"
+    fi
     notify "❌ Restore failed: rollback executed"
     exit 1
 fi
@@ -242,7 +282,7 @@ echo "[$COUNT] $(date '+%Y-%m-%d %H:%M:%S') restored: $(basename "$LATEST")" >> 
 # diff通知
 # =========================
 
-if [ -f "$TARGET_FILE" ]; then
+if [ -f "$ROLLBACK_FILE" ] && [ -f "$TARGET_FILE" ]; then
     DIFF_OUTPUT=$(diff "$ROLLBACK_FILE" "$TARGET_FILE" | head -20 || true)
     if [ -n "$DIFF_OUTPUT" ]; then
         notify "📊 Restore diff:\n$DIFF_OUTPUT"
