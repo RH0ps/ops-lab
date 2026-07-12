@@ -111,11 +111,13 @@ if [ -f "$LATEST" ]; then
     # index_20260706_092702.html → 20260706092702
     FILE_DATE=$(echo "$FILE_NAME" | sed -E 's/index_([0-9]{8})_([0-9]{6})\.html/\1\2/')
 
-    # GNU & BSD 両対応
     if date -d "2020-01-01" +%s >/dev/null 2>&1; then
-
-    BACKUP_TIME=$(date -d "$year-$month-$day $hour:$min:$sec" +%s)
+    # GNU date: extract from FILE_DATE (YYYYMMDDHHMMSS)
+    BACKUP_TIME=$(date -d "${FILE_DATE:0:4}-${FILE_DATE:4:2}-${FILE_DATE:6:2} ${FILE_DATE:8:2}:${FILE_DATE:10:2}:${FILE_DATE:12:2}" +%s)
     else
+    # macOS: BSD date
+    BACKUP_TIME=$(date -j -f "%Y%m%d%H%M%S" "${FILE_DATE}" +%s)
+    fi
 
     # macOS: date -j
     BACKUP_TIME=$(date -j -f "%Y%m%d%H%M%S" "${FILE_DATE}" +%s)
@@ -251,12 +253,14 @@ fi
 # 完了
 # =========================
 
-log "Restore file size: $(stat -f%z "$TARGET_FILE" 2>/dev/null || stat -c%s "$TARGET_FILE") bytes"
+FILE_SIZE=""
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    FILE_SIZE=$(stat -f%z "$TARGET_FILE" 2>/dev/null || echo 0)
+else
+    FILE_SIZE=$(stat -c%s "$TARGET_FILE" 2>/dev/null || echo 0)
+fi
+log "Restore file size: $FILE_SIZE bytes"
 log "Restore completed: $(basename "$LATEST")"
 notify "♻️ Restore completed: $(basename "$LATEST")"
-
-if [[ -f "/home/r.h/docker/.env" ]]; then
-    source "/home/r.h/docker/.env"
-fi
 
 exit 0
