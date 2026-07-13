@@ -82,15 +82,38 @@ export LC_ALL=C
 # cpu usage (safe)
 # ------------------------------------------------------------------------------
 
-CPU_LINE="$(top -l 1 | grep "CPU usage" || true)"
+get_cpu_usage() {
 
-IDLE="$(echo "$CPU_LINE" | sed -E 's/.* ([0-9.]+)% idle.*/\1/')"
+    if [[ "$(uname)" == "Darwin" ]]; then
 
-USAGE="$(awk -v idle="$IDLE" 'BEGIN {
-    printf "%.0f", 100 - idle
-}')"
+        CPU_LINE="$(top -l 1 | grep "CPU usage" || true)"
+        IDLE="$(echo "$CPU_LINE" | sed -E 's/.* ([0-9.]+)% idle.*/\1/')"
 
-if ! [[ "$USAGE" =~ ^[0-9]+$ ]]; then
+        awk -v idle="$IDLE" 'BEGIN {
+            printf "%.0f", 100 - idle
+        }'
+
+    else
+
+        IDLE="$(top -bn1 | awk '/Cpu\(s\)/ {
+            for(i=1;i<=NF;i++){
+                if($i ~ /id,/){
+                    gsub(/id,/,"",$i)
+                    print $i
+                } 
+            }
+        }')"
+        
+        awk -v idle="$IDLE" 'BEGIN {
+            printf "%.0f", 100 - idle
+        }'
+
+    fi
+}
+
+USAGE="$(get_cpu_usage)"
+
+if ! [[ "$USAGE" =~ ^[0-9]+$ ]] || (( USAGE < 0 || USAGE > 100 )); then
     echo "$(date "+%F %T") [FATAL] invalid cpu usage=$USAGE" >> "$LOG_FILE"
     exit 1
 fi
@@ -139,9 +162,9 @@ if [[ "$state" != "$prev_state" ]]; then
     HOSTNAME="$(hostname 2>/dev/null || echo "unknown")"
 
     case "$state" in
-        CRITICAL) TEXT="🚨 CRITICAL [$HOSTNAME]: ${USAGE}% disk usage" ;;
-        WARN)     TEXT="⚠️ WARNING [$HOSTNAME]: ${USAGE}% disk usage" ;;
-        OK)       TEXT="✅ RECOVERY [$HOSTNAME]: ${USAGE}% disk usage" ;;
+        CRITICAL) TEXT="🚨 CRITICAL [$HOSTNAME]: CPU usage ${USAGE}%" ;;
+        WARN)     TEXT="⚠️ WARNING [$HOSTNAME]: CPU usage ${USAGE}%" ;;
+        OK)       TEXT="✅ RECOVERY [$HOSTNAME]: CPU usage ${USAGE}%" ;;
         *)        TEXT="ℹ️ UNKNOWN [$HOSTNAME]: ${USAGE}%" ;;
     esac
 
