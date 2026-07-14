@@ -1,4 +1,11 @@
-*/5 * * * * /bin/bash /path/to/disk_monitor.sh
+# Disk monitoring (every 5 minutes)
+*/5 * * * * /bin/bash /home/r.h/docker/disk_monitor.sh >> /home/r.h/docker/logs/cron.log 2>&1
 
-0 9 * * * /home/r.h/docker/backup.sh >> /home/r.h/docker/cron.log 2>&1
+# CPU monitoring (every 5 minutes)
+*/5 * * * * /bin/bash /home/r.h/docker/cpu_monitor.sh >> /home/r.h/docker/logs/cron.log 2>&1
 
+# Daily backup (09:00)
+0 9 * * * /bin/bash /home/r.h/docker/backup.sh >> /home/r.h/docker/logs/cron.log 2>&1
+
+# Log rotation (03:00)
+0 3 * * * /bin/bash /home/r.h/docker/log_rotate.sh >> /home/r.h/docker/logs/cron.log 2>&1
