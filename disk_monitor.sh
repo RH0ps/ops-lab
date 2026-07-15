@@ -26,6 +26,9 @@ trap 'echo "$(date "+%F %T") [ERROR] line $LINENO" >&2' ERR
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 PROJECT_ROOT="$(cd "$(dirname "$SCRIPT_PATH")" && pwd 2>/dev/null || pwd)"
+LOG_FILE="$PROJECT_ROOT/logs/monitor.log"
+
+source "$PROJECT_ROOT/lib/log.sh"
 
 ENV_FILE="$PROJECT_ROOT/.env"
 if [[ -f "$ENV_FILE" ]]; then
@@ -60,7 +63,7 @@ fi
 
 exec 9>"$LOCK_FILE"
 flock -n 9 || {
-    echo "$(date "+%F %T") [WARN] already running" >> "$LOG_FILE"
+    log_warn "already running"
     exit 0
 }
 
@@ -91,7 +94,7 @@ fi
 USAGE="$(echo "$DF_OUT" | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
 
 if ! [[ "$USAGE" =~ ^[0-9]+$ ]]; then
-    echo "$(date "+%F %T") [FATAL] invalid usage=$USAGE" >> "$LOG_FILE"
+    log_error "invalid usage=$USAGE"
     exit 1
 fi
 
@@ -109,7 +112,7 @@ else
     state="OK"
 fi
 
-echo "$(date "+%F %T") [INFO] usage=${USAGE}% state=${state}" >> "$LOG_FILE"
+log_info "usage=${USAGE}% state=${state}"
 
 # ------------------------------------------------------------------------------
 # metrics (atomic safe)
@@ -165,18 +168,18 @@ if [[ "$state" != "$prev_state" ]]; then
         if [[ "$HTTP_CODE" == "200" ]]; then
             SLACK_OK=1
         else
-            echo "$(date "+%F %T") [WARN] slack failed code=$HTTP_CODE" >> "$LOG_FILE"
+            log_warn "slack failed code=$HTTP_CODE"
         fi
     else
         SLACK_OK=1
-        echo "$(date "+%F %T") [INFO] slack disabled" >> "$LOG_FILE"
+        log_info "slack disabled"
     fi
 
     STATE_TMP="$(mktemp 2>/dev/null || echo "/tmp/state.$$")"
     echo "$state" > "$STATE_TMP"
     mv "$STATE_TMP" "$STATE_FILE" 2>/dev/null || true
 
-    echo "$(date "+%F %T") [INFO] state: $prev_state -> $state (slack=$SLACK_OK)" >> "$LOG_FILE"
+    log_info "state: $prev_state -> $state (slack=$SLACK_OK)"
 fi
 
 # ------------------------------------------------------------------------------
@@ -188,7 +191,7 @@ SIZE="$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)"
 if (( SIZE > 10485760 )); then
     cp "$LOG_FILE" "${LOG_FILE}.old" 2>/dev/null || true
     : > "$LOG_FILE" 2>/dev/null || true
-    echo "$(date "+%F %T") [INFO] log rotated" >> "$LOG_FILE"
+    log_info "log rotated"
 fi
 
 exit 0
