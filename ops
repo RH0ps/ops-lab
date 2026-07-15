@@ -26,6 +26,12 @@ COMMANDS=(
   exec
   cat
   backup
+  cpu
+  restore
+  rotate
+  health-check
+  metrics
+  state
   disk
   prune
   clean
@@ -128,6 +134,24 @@ case "$1" in
     ;;
   version)
     ops_version
+    ;;
+    cpu)
+    ops_cpu
+    ;;
+    restore)
+    ops_restore
+    ;;
+    rotate)
+    ops_rotate
+    ;;
+    health-check)
+    ops_health_check
+    ;;
+    metrics)
+    ops_metrics
+    ;;
+    state)
+    ops_state
     ;;
   *)
     echo "Unknown command: $1"

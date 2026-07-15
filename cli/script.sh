@@ -24,6 +24,32 @@ ops_backup(){
   docker exec "$CID" bash "$OPS_SCRIPT/backup.sh"
 }
 
+ops_cpu() {
+    docker exec ops-lab bash -c "/home/r.h/docker/cpu_monitor.sh"
+}
+
+ops_restore() {
+    docker exec -it ops-lab bash -c "/home/r.h/docker/restore.sh"
+}
+
+ops_rotate() {
+    docker exec ops-lab bash -c "/home/r.h/docker/log_rotate.sh"
+}
+
+ops_health_check() {
+    local ROOT
+    ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    bash "$ROOT/health_check.sh"
+}
+
+ops_metrics() {
+    docker exec ops-lab bash -c "ls -lh /home/r.h/docker/metrics && echo && cat /home/r.h/docker/metrics/*"
+}
+
+ops_state() {
+    docker exec ops-lab bash -c "ls -lh /home/r.h/docker/state && echo && for f in /home/r.h/docker/state/*; do echo \"===== \$(basename \$f) =====\"; cat \"\$f\"; echo; done"
+}
+
 ops_disk(){
   local CID
   CID=$(ops_check) || return 1
