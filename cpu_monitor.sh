@@ -41,7 +41,7 @@ METRIC_DIR="${METRIC_DIR:-$BASE_DIR/metrics}"
 
 mkdir -p "$LOG_DIR" "$STATE_DIR" "$METRIC_DIR" 2>/dev/null || true
 
-LOG_FILE="$LOG_DIR/monitor.log"
+LOG_FILE="$LOG_DIR/cpu.log"
 STATE_FILE="$STATE_DIR/cpu_state.txt"
 METRIC_FILE="$METRIC_DIR/cpu.prom"
 
