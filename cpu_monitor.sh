@@ -45,6 +45,8 @@ LOG_FILE="$LOG_DIR/cpu.log"
 STATE_FILE="$STATE_DIR/cpu_state.txt"
 METRIC_FILE="$METRIC_DIR/cpu.prom"
 
+source "$PROJECT_ROOT/lib/log.sh"
+
 # log fallback
 if ! touch "$LOG_FILE" 2>/dev/null; then
     LOG_FILE="/tmp/monitor.log"
@@ -60,7 +62,7 @@ fi
 
 exec 9>"$LOCK_FILE"
 flock -n 9 || {
-    echo "$(date "+%F %T") [WARN] already running" >> "$LOG_FILE"
+    log_warn "already running"
     exit 0
 }
 
@@ -114,7 +116,7 @@ get_cpu_usage() {
 USAGE="$(get_cpu_usage)"
 
 if ! [[ "$USAGE" =~ ^[0-9]+$ ]] || (( USAGE < 0 || USAGE > 100 )); then
-    echo "$(date "+%F %T") [FATAL] invalid cpu usage=$USAGE" >> "$LOG_FILE"
+    log_error "invalid cpu usage=$USAGE"
     exit 1
 fi
 
@@ -132,7 +134,7 @@ else
     state="OK"
 fi
 
-echo "$(date "+%F %T") [INFO] usage=${USAGE}% state=${state}" >> "$LOG_FILE"
+log_info "usage=${USAGE}% state=${state}"
 
 # ------------------------------------------------------------------------------
 # metrics (atomic safe)
@@ -188,18 +190,18 @@ if [[ "$state" != "$prev_state" ]]; then
         if [[ "$HTTP_CODE" == "200" ]]; then
             SLACK_OK=1
         else
-            echo "$(date "+%F %T") [WARN] slack failed code=$HTTP_CODE" >> "$LOG_FILE"
+            log_warn "slack failed code=$HTTP_CODE"
         fi
     else
         SLACK_OK=1
-        echo "$(date "+%F %T") [INFO] slack disabled" >> "$LOG_FILE"
+        log_info "slack disabled"
     fi
 
     STATE_TMP="$(mktemp 2>/dev/null || echo "/tmp/state.$$")"
     echo "$state" > "$STATE_TMP"
     mv "$STATE_TMP" "$STATE_FILE" 2>/dev/null || true
 
-    echo "$(date "+%F %T") [INFO] state: $prev_state -> $state (slack=$SLACK_OK)" >> "$LOG_FILE"
+    log_info "state: $prev_state -> $state (slack=$SLACK_OK)"
 fi
 
 # ------------------------------------------------------------------------------
@@ -211,7 +213,7 @@ SIZE="$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)"
 if (( SIZE > 10485760 )); then
     cp "$LOG_FILE" "${LOG_FILE}.old" 2>/dev/null || true
     : > "$LOG_FILE" 2>/dev/null || true
-    echo "$(date "+%F %T") [INFO] log rotated" >> "$LOG_FILE"
+    log_info "log rotated"
 fi
 
 exit 0
