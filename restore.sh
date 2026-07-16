@@ -6,24 +6,33 @@ set -euo pipefail
 # 設定
 # =========================
 
-TARGET_FILE="/home/r.h/docker/index.html"
-BACKUP_DIR="/home/r.h/backup"
-LOG_FILE="/home/r.h/docker/logs/restore.log"
-ROLLBACK_FILE="/home/r.h/docker/index.html.rollback"
-HISTORY_FILE="/home/r.h/docker/logs/restore_history.log"
-COUNT_FILE="/home/r.h/docker/state/restore_count"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SNAPSHOT_DIR="/home/r.h/docker/backup_snapshots"
-JSON_LOG="/home/r.h/docker/logs/restore_history.jsonl"
+LOG_FILE="$PROJECT_ROOT/logs/restore.log"
+
+mkdir -p "$PROJECT_ROOT/logs"
+
+source "$PROJECT_ROOT/lib/log.sh"
+
+TARGET_FILE="$PROJECT_ROOT/index.html"
+BACKUP_DIR="$PROJECT_ROOT/backup"
+ROLLBACK_FILE="$PROJECT_ROOT/index.html.rollback"
+HISTORY_FILE="$PROJECT_ROOT/logs/restore_history.log"
+COUNT_FILE="$PROJECT_ROOT/state/restore_count"
+
+SNAPSHOT_DIR="$PROJECT_ROOT/backup_snapshots"
+JSON_LOG="$PROJECT_ROOT/logs/restore_history.jsonl"
 
 LOCK_FILE="/tmp/restore.lock"
 MAX_AGE_SEC=$((60*60*24*7))  # 7日
 
-if [ -f "/home/r.h/docker/.env" ]; then
-    source "/home/r.h/docker/.env"
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    source "$PROJECT_ROOT/.env"
 fi
 
-WEBHOOK_URL="${WEBHOOK_URL:?WEBHOOK_URL is required}"
+WEBHOOK_URL="${WEBHOOK_URL:-}"
+SLACK_ENABLED=0
+[[ -n "$WEBHOOK_URL" ]] && SLACK_ENABLED=1
 
 FORCE="${FORCE:-false}"
 
@@ -60,11 +69,6 @@ hash_file() {
     fi
 }
 
-# ログ関数
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
-}
-
 # =========================
 # 準備（ディレクトリ作成）
 # =========================
@@ -81,7 +85,7 @@ mkdir -p "$(dirname "$JSON_LOG")"
 exec 9>"$LOCK_FILE"
 
 flock -n 9 || {
-    log "Restore already running"
+    log_warn "Restore already running"
     exit 0
 }
 
@@ -90,6 +94,9 @@ flock -n 9 || {
 # =========================
 
 notify() {
+
+    [[ "$SLACK_ENABLED" -eq 0 ]] && return 0
+
     local message="$1"
 
     if ! curl -sS \
@@ -99,7 +106,7 @@ notify() {
         --data "$(jq -n --arg text "$message" '{text:$text}')" \
         "$WEBHOOK_URL" >/dev/null 2>&1
     then
-        log "Slack notification failed"
+        log_warn "Slack notification failed"
         return 1
     fi
 }
@@ -144,19 +151,19 @@ fi
 # =========================
 
 if [ -z "${LATEST:-}" ] || [ ! -f "$LATEST" ]; then
-    log "No backup found"
+    log_error "No backup found"
     notify "❌ Restore failed: no backup"
     exit 1
 fi
 
 if [[ ! "$LATEST" == "$BACKUP_DIR"/* ]]; then
-    log "ERROR: Path outside backup directory"
+    log_error "ERROR: Path outside backup directory"
     notify "❌ Restore blocked: invalid path"
     exit 1
 fi
 
 if [ ! -s "$LATEST" ]; then
-    log "Invalid backup: $LATEST"
+    log_error "Invalid backup: $LATEST"
     notify "❌ Restore failed: invalid backup"
     exit 1
 fi
@@ -182,12 +189,12 @@ if [[ "$FILE_NAME" =~ ^index_[0-9]{8}_[0-9]{6}\.html$ ]]; then
     AGE=$(( $(date +%s) - BACKUP_TIME ))
 
     if [ "$AGE" -gt "$MAX_AGE_SEC" ]; then
-        log "Backup too old: $LATEST"
+        log_warn "Backup too old: $LATEST"
         notify "⚠️ Restore blocked: backup too old"
         exit 1
     fi
 else
-    log "Invalid backup filename format: $FILE_NAME"
+    log_error "Invalid backup filename format: $FILE_NAME"
     notify "❌ Restore blocked: invalid backup filename format"
     exit 1
 fi
@@ -199,7 +206,7 @@ fi
 if [ -f "$TARGET_FILE" ]; then
     SNAPSHOT_FILE="$SNAPSHOT_DIR/index_$(date +%Y%m%d_%H%M%S).html"
     cp -a "$TARGET_FILE" "$SNAPSHOT_FILE"
-    log "Snapshot saved: $(basename "$SNAPSHOT_FILE")"
+    log_info "Snapshot saved: $(basename "$SNAPSHOT_FILE")"
 fi
 
 # =========================
@@ -227,7 +234,7 @@ if [ "$FORCE" != "true" ]; then
     read -p "Are you sure? (y/N): " -r
 
     if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-        log "Restore cancelled"
+        log_info "Restore cancelled"
         notify "⚠️ Restore cancelled"
         exit 0
     fi
@@ -239,7 +246,7 @@ fi
 
 if [ -f "$TARGET_FILE" ]; then
     cp -a "$TARGET_FILE" "$ROLLBACK_FILE"
-    log "Rollback saved"
+    log_info "Rollback saved"
 fi
 
 # =========================
@@ -255,12 +262,12 @@ cp -a "$LATEST" "$TARGET_FILE"
 RESTORED_HASH=$(hash_file "$TARGET_FILE")
 
 if [ "$RESTORED_HASH" != "$BACKUP_HASH" ]; then
-    log "Hash mismatch detected, rollback triggered"
+    log_error "Hash mismatch detected, rollback triggered"
     # 【修正②】ロールバックファイルが存在する場合のみ安全に cp を実行する
     if [ -f "$ROLLBACK_FILE" ]; then
         cp -a "$ROLLBACK_FILE" "$TARGET_FILE"
     else
-        log "Rollback skipped: rollback file does not exist"
+        log_warn "Rollback skipped: rollback file does not exist"
     fi
     notify "❌ Restore failed: rollback executed"
     exit 1
@@ -299,8 +306,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 else
     FILE_SIZE=$(stat -c%s "$TARGET_FILE" 2>/dev/null || echo 0)
 fi
-log "Restore file size: $FILE_SIZE bytes"
-log "Restore completed: $(basename "$LATEST")"
+log_info "Restore file size: $FILE_SIZE bytes"
+log_info "Restore completed: $(basename "$LATEST")"
 notify "♻️ Restore completed: $(basename "$LATEST")"
 
 exit 0
