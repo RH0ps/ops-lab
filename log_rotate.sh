@@ -7,9 +7,10 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$PROJECT_ROOT/logs"
 mkdir -p "$LOG_DIR"
 
-LOG_FILE="$LOG_DIR/rotate.log"
-
+# shellcheck source=./lib/log.sh
 source "$PROJECT_ROOT/lib/log.sh"
+
+LOG_FILE="$LOG_DIR/rotate.log"
 
 KEEP_DAYS="${KEEP_DAYS:-7}"
 
@@ -54,3 +55,5 @@ fi
 
 
 log_info "Finished log rotation"
+
+exit 0

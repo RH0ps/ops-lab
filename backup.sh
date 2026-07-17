@@ -5,22 +5,27 @@ set -euo pipefail
 # 設定
 # =========================
 
-TARGET_FILE="/home/r.h/docker/index.html"
-BACKUP_DIR="/home/r.h/backup"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+TARGET_FILE="$PROJECT_ROOT/index.html"
+BACKUP_DIR="$PROJECT_ROOT/backup"
 LOG_FILE="$PROJECT_ROOT/logs/backup.log"
 
+# shellcheck source=./lib/log.sh
 source "$PROJECT_ROOT/lib/log.sh"
-METRIC_FILE="/home/r.h/docker/metrics/backup.prom"
-SUCCESS_FILE="/home/r.h/docker/state/backup_success_count"
-FAILURE_FILE="/home/r.h/docker/state/backup_failure_count"
 
-if [ -f "/home/r.h/docker/.env" ]; then
-    source "/home/r.h/docker/.env"
+METRIC_FILE="$PROJECT_ROOT/metrics/backup.prom"
+SUCCESS_FILE="$PROJECT_ROOT/state/backup_success_count"
+FAILURE_FILE="$PROJECT_ROOT/state/backup_failure_count"
+
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    # shellcheck source=./.env
+    source "$PROJECT_ROOT/.env"
 fi
 
-WEBHOOK_URL="${WEBHOOK_URL:?WEBHOOK_URL is required}"
+WEBHOOK_URL="${WEBHOOK_URL:-}"
+SLACK_ENABLED=0
+[[ -n "$WEBHOOK_URL" ]] && SLACK_ENABLED=1
 
 DRY_RUN="${DRY_RUN:-false}"
 
@@ -33,6 +38,8 @@ KEEP_BACKUPS=10
 
 notify() {
     local message="$1"
+
+    [[ "$SLACK_ENABLED" -eq 0 ]] && return 0
 
     if ! curl -s -X POST \
         -H "Content-type: application/json" \

@@ -12,6 +12,7 @@ LOG_FILE="$PROJECT_ROOT/logs/restore.log"
 
 mkdir -p "$PROJECT_ROOT/logs"
 
+# shellcheck source=./lib/log.sh
 source "$PROJECT_ROOT/lib/log.sh"
 
 TARGET_FILE="$PROJECT_ROOT/index.html"
@@ -27,6 +28,7 @@ LOCK_FILE="/tmp/restore.lock"
 MAX_AGE_SEC=$((60*60*24*7))  # 7日
 
 if [ -f "$PROJECT_ROOT/.env" ]; then
+    # shellcheck source=./.env
     source "$PROJECT_ROOT/.env"
 fi
 

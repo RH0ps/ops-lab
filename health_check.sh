@@ -7,10 +7,14 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "===== Health Check ====="
 
 # Docker
-if docker ps --format '{{.Names}}' | grep -q "^ops-lab$"; then
-    echo "[OK] Docker container"
+if command -v docker >/dev/null 2>&1; then
+    if docker ps --format '{{.Names}}' | grep -q "^ops-lab$"; then
+        echo "[OK] Docker container"
+    else
+        echo "[ERROR] Docker container"
+    fi
 else
-    echo "[ERROR] Docker container"
+    echo "[INFO] Docker command not available"
 fi
 
 # Scripts

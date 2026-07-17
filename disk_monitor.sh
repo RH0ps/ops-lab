@@ -8,7 +8,7 @@ set -Eeuo pipefail
 # ------------------------------------------------------------------------------
 # globals
 # ------------------------------------------------------------------------------
-LOCK_FD=9
+
 LOCK_FILE="/tmp/disk_monitor.lock"
 STATE_TMP=""
 METRIC_TMP=""
@@ -25,14 +25,20 @@ trap 'echo "$(date "+%F %T") [ERROR] line $LINENO" >&2' ERR
 # ------------------------------------------------------------------------------
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
-PROJECT_ROOT="$(cd "$(dirname "$SCRIPT_PATH")" && pwd 2>/dev/null || pwd)"
+if PROJECT_ROOT="$(cd "$(dirname "$SCRIPT_PATH")" && pwd 2>/dev/null)"; then
+    :
+else
+    PROJECT_ROOT="$(pwd)"
+fi
 LOG_FILE="$PROJECT_ROOT/logs/monitor.log"
 
+# shellcheck source=./lib/log.sh
 source "$PROJECT_ROOT/lib/log.sh"
 
 ENV_FILE="$PROJECT_ROOT/.env"
 if [[ -f "$ENV_FILE" ]]; then
     set +u
+    # shellcheck disable=SC1090
     source "$ENV_FILE" 2>/dev/null || true
     set -u
 fi
