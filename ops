@@ -20,6 +20,7 @@ COMMANDS=(
   rebuild
   update
   status
+  monitor
   health
   cron
   logs
@@ -152,6 +153,9 @@ case "$1" in
     ;;
     state)
     ops_state
+    ;;
+    monitor)
+    ops_monitor_status
     ;;
   *)
     echo "Unknown command: $1"
