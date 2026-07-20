@@ -7,7 +7,10 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-TARGET_FILE="$PROJECT_ROOT/index.html"
+TARGETS=(
+    "index.html"
+    "docker-compose.yml"
+)
 BACKUP_DIR="$PROJECT_ROOT/backup"
 LOG_FILE="$PROJECT_ROOT/logs/backup.log"
 
@@ -86,51 +89,63 @@ mkdir -p "$(dirname "$SUCCESS_FILE")"
 [ -f "$FAILURE_FILE" ] || echo 0 > "$FAILURE_FILE"
 
 DATE=$(date "+%Y%m%d_%H%M%S")
-BACKUP_FILE="index_${DATE}.html"
 
 # =========================
 # チェック
 # =========================
 
-if [ ! -f "$TARGET_FILE" ]; then
-    log_error "Target file not found: $TARGET_FILE"
-    notify "❌ Backup failed: file not found"
-    exit 1
-fi
+for TARGET in "${TARGETS[@]}"; do
 
-if [ ! -s "$TARGET_FILE" ]; then
-    log_error "Target file is empty"
-    notify "❌ Backup failed: empty file"
-    exit 1
-fi
+    TARGET_FILE="$PROJECT_ROOT/$TARGET"
 
-# =========================
-# バックアップ実行
-# =========================
+    if [ ! -f "$TARGET_FILE" ]; then
+        log_error "Target file not found: $TARGET_FILE"
+        notify "❌ Backup failed: file not found"
+        exit 1
+    fi
 
-cp -a "$TARGET_FILE" "$BACKUP_DIR/$BACKUP_FILE"
-log_info "Backup created: $BACKUP_FILE"
+    if [ ! -s "$TARGET_FILE" ]; then
+        log_error "Target file is empty: $TARGET_FILE"
+        notify "❌ Backup failed: empty file"
+        exit 1
+    fi
 
-if [ ! -f "$BACKUP_DIR/$BACKUP_FILE" ]; then
-    log_error "Backup file was not created"
-    notify "❌ Backup failed: file creation error"
-    exit 1
-fi
+    EXT="${TARGET##*.}"
+    NAME="${TARGET%.*}"
+    BACKUP_FILE="${NAME}_${DATE}.${EXT}"
+
+    cp -a "$TARGET_FILE" "$BACKUP_DIR/$BACKUP_FILE"
+
+    log_info "Backup created: $BACKUP_FILE"
+
+    notify "📦 Backup success: $BACKUP_FILE"
+
+done
 
 # =========================
 # 世代管理
 # =========================
 
-mapfile -t files < <(ls -1t "$BACKUP_DIR"/index_*.html 2>/dev/null)
+for TARGET in "${TARGETS[@]}"; do
 
-if [ "${#files[@]}" -gt "$KEEP_BACKUPS" ]; then
-    for ((i=KEEP_BACKUPS; i<${#files[@]}; i++)); do
-        rm -f "${files[$i]}"
-    done
-    log_info "Rotation completed (kept $KEEP_BACKUPS backups)"
-else
-    log_info "Rotation skipped (not enough files)"
-fi
+    NAME="${TARGET%.*}"
+    EXT="${TARGET##*.}"
+
+    mapfile -t files < <(
+        ls -1t "$BACKUP_DIR"/"${NAME}"_*."${EXT}" 2>/dev/null
+    )
+
+    if [ "${#files[@]}" -gt "$KEEP_BACKUPS" ]; then
+        for ((i=KEEP_BACKUPS; i<${#files[@]}; i++)); do
+            rm -f "${files[$i]}"
+        done
+
+        log_info "Rotation completed: ${NAME} (kept $KEEP_BACKUPS)"
+    else
+        log_info "Rotation skipped: ${NAME}"
+    fi
+
+done
 
 # =========================
 # 成功通知
@@ -147,9 +162,6 @@ FAILURE_COUNT=$(cat "$FAILURE_FILE")
     echo "backup_failure_total $FAILURE_COUNT"
     echo "backup_last_timestamp $(date +%s)"
 } > "$METRIC_FILE"
-
-log_info "Backup success: $BACKUP_FILE"
-notify "📦 Backup success: $BACKUP_FILE ($(date '+%Y-%m-%d %H:%M:%S'))"
 
 exit 0
 

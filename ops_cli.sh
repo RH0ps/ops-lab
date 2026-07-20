@@ -22,4 +22,5 @@ source "$CLI_DIR/diagnose.sh"
 source "$CLI_DIR/help.sh"
 # shellcheck source=./cli/version.sh
 source "$CLI_DIR/version.sh"
-
+# shellcheck source=./cli/backup.sh
+source "$CLI_DIR/backup.sh"

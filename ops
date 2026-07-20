@@ -27,6 +27,7 @@ COMMANDS=(
   exec
   cat
   backup
+  backup-list
   cpu
   restore
   rotate
@@ -156,6 +157,9 @@ case "$1" in
     ;;
     monitor)
     ops_monitor_status
+    ;;
+    backup-list)
+    ops_backup_list
     ;;
   *)
     echo "Unknown command: $1"
