@@ -8,6 +8,11 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+TARGETS=(
+    "index.html"
+    "docker-compose.yml"
+)
+
 LOG_FILE="$PROJECT_ROOT/logs/restore.log"
 
 mkdir -p "$PROJECT_ROOT/logs"
@@ -15,14 +20,24 @@ mkdir -p "$PROJECT_ROOT/logs"
 # shellcheck source=./lib/log.sh
 source "$PROJECT_ROOT/lib/log.sh"
 
-TARGET_FILE="$PROJECT_ROOT/index.html"
+echo "Restore target"
+
+select TARGET in "${TARGETS[@]}"; do
+    [ -n "$TARGET" ] && break
+done
+
+TARGET_FILE="$PROJECT_ROOT/$TARGET"
+
+NAME="${TARGET%.*}"
+EXT="${TARGET##*.}"
+
+ROLLBACK_FILE="$PROJECT_ROOT/${NAME}.rollback.${EXT}"
 BACKUP_DIR="$PROJECT_ROOT/backup"
-ROLLBACK_FILE="$PROJECT_ROOT/index.html.rollback"
-HISTORY_FILE="$PROJECT_ROOT/logs/restore_history.log"
-COUNT_FILE="$PROJECT_ROOT/state/restore_count"
+HISTORY_FILE="$PROJECT_ROOT/logs/${NAME}_restore_history.log"
+COUNT_FILE="$PROJECT_ROOT/state/${NAME}_restore_count"
 
 SNAPSHOT_DIR="$PROJECT_ROOT/backup_snapshots"
-JSON_LOG="$PROJECT_ROOT/logs/restore_history.jsonl"
+JSON_LOG="$PROJECT_ROOT/logs/${NAME}_restore_history.jsonl"
 
 LOCK_FILE="/tmp/restore.lock"
 MAX_AGE_SEC=$((60*60*24*7))  # 7日
@@ -39,24 +54,23 @@ SLACK_ENABLED=0
 FORCE="${FORCE:-false}"
 
 # =========================
-# 依存コマンド確認 (macOS / Linux 共通)
+# ロック対応確認（macOS / Linux）
 # =========================
 
-# 【修正①】ログディレクトリ作成前に実行されるため、標準エラー出力へ直接出力して安全に exit する
-command -v flock >/dev/null 2>&1 || {
-    echo "ERROR: flock command not found. (Required for lock mechanism)" >&2
-    exit 1
-}
+if command -v flock >/dev/null 2>&1; then
+    LOCK_SUPPORTED=true
+else
+    LOCK_SUPPORTED=false
+fi
 
-command -v jq >/dev/null 2>&1 || {
-    echo "ERROR: jq command not found." >&2
-    exit 1
-}
+if [ "$LOCK_SUPPORTED" = true ]; then
+    exec 9>"$LOCK_FILE"
 
-command -v curl >/dev/null 2>&1 || {
-    echo "ERROR: curl command not found." >&2
-    exit 1
-}
+    flock -n 9 || {
+        log_warn "Restore already running"
+        exit 0
+    }
+fi
 
 # =========================
 # 互換関数定義
@@ -79,17 +93,6 @@ mkdir -p "$(dirname "$LOG_FILE")"
 mkdir -p "$SNAPSHOT_DIR"
 mkdir -p "$(dirname "$COUNT_FILE")"
 mkdir -p "$(dirname "$JSON_LOG")"
-
-# =========================
-# ロック（多重実行防止）
-# =========================
-
-exec 9>"$LOCK_FILE"
-
-flock -n 9 || {
-    log_warn "Restore already running"
-    exit 0
-}
 
 # =========================
 # 通知関数
@@ -127,7 +130,12 @@ fi
 # =========================
 
 echo "===== backup list ====="
-find "$BACKUP_DIR" -maxdepth 1 -name "index_*.html" -type f 2>/dev/null | sort -r || true
+
+find "$BACKUP_DIR" \
+    -maxdepth 1 \
+    -name "${NAME}_*.${EXT}" \
+    -type f \
+    | sort -r || true
 echo "======================="
 
 # =========================
@@ -137,15 +145,22 @@ echo "======================="
 TARGET_BACKUP="${1:-}"
 
 if [ -n "$TARGET_BACKUP" ]; then
-    if [[ "$TARGET_BACKUP" == /* ]]; then
-        LATEST="$TARGET_BACKUP"
-    else
-        LATEST="$BACKUP_DIR/$TARGET_BACKUP"
+
+    if [[ "$TARGET_BACKUP" == */* ]]; then
+        log_error "Invalid backup name"
+        exit 1
     fi
+
+    LATEST="$BACKUP_DIR/$TARGET_BACKUP"
+
 else
     LATEST=$(
-        find "$BACKUP_DIR" -maxdepth 1 -name "index_*.html" -type f 2>/dev/null | sort | tail -1 || true
-    )
+    find "$BACKUP_DIR" \
+        -maxdepth 1 \
+        -name "${NAME}_*.${EXT}" \
+        -type f \
+        | sort | tail -1
+)
 fi
 
 # =========================
@@ -177,8 +192,10 @@ fi
 
 FILE_NAME=$(basename "$LATEST")
 
-if [[ "$FILE_NAME" =~ ^index_[0-9]{8}_[0-9]{6}\.html$ ]]; then
-    FILE_DATE=$(echo "$FILE_NAME" | sed -E 's/index_([0-9]{8})_([0-9]{6})\.html/\1\2/')
+REGEX="^${NAME}_[0-9]{8}_[0-9]{6}\\.${EXT}$"
+
+if [[ "$FILE_NAME" =~ $REGEX ]]; then
+    FILE_DATE=$(echo "$FILE_NAME" | sed -E "s/${NAME}_([0-9]{8})_([0-9]{6})\\.${EXT}/\\1\\2/")
 
     if date -d "2020-01-01" +%s >/dev/null 2>&1; then
         BACKUP_TIME=$(date -d \
@@ -206,7 +223,7 @@ fi
 # =========================
 
 if [ -f "$TARGET_FILE" ]; then
-    SNAPSHOT_FILE="$SNAPSHOT_DIR/index_$(date +%Y%m%d_%H%M%S).html"
+    SNAPSHOT_FILE="$SNAPSHOT_DIR/${NAME}_$(date +%Y%m%d_%H%M%S).${EXT}"
     cp -a "$TARGET_FILE" "$SNAPSHOT_FILE"
     log_info "Snapshot saved: $(basename "$SNAPSHOT_FILE")"
 fi
