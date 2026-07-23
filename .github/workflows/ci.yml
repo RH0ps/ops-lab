@@ -15,10 +15,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install ShellCheck
+      - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck
+          sudo apt-get install -y shellcheck bats
 
       - name: Bash Syntax Check
         run: |
@@ -33,6 +33,10 @@ jobs:
             echo "ShellCheck: $file"
             shellcheck -S error -e SC1091,SC2012,SC2034 "$file"
           done
+
+      - name: Run Bats Tests
+        run: |
+          bats tests
 
       - name: Docker Build
         run: |
