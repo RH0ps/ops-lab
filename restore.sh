@@ -31,6 +31,9 @@ TARGET_FILE="$PROJECT_ROOT/$TARGET"
 NAME="${TARGET%.*}"
 EXT="${TARGET##*.}"
 
+METRIC_FILE="$PROJECT_ROOT/metrics/restore.prom"
+SUCCESS_FILE="$PROJECT_ROOT/state/restore_success_count"
+FAILURE_FILE="$PROJECT_ROOT/state/restore_failure_count"
 ROLLBACK_FILE="$PROJECT_ROOT/${NAME}.rollback.${EXT}"
 BACKUP_DIR="$PROJECT_ROOT/backup"
 HISTORY_FILE="$PROJECT_ROOT/logs/${NAME}_restore_history.log"
@@ -89,10 +92,14 @@ hash_file() {
 # 準備（ディレクトリ作成）
 # =========================
 
-mkdir -p "$(dirname "$LOG_FILE")"
 mkdir -p "$SNAPSHOT_DIR"
 mkdir -p "$(dirname "$COUNT_FILE")"
 mkdir -p "$(dirname "$JSON_LOG")"
+
+mkdir -p "$(dirname "$METRIC_FILE")"
+
+[ -f "$SUCCESS_FILE" ] || echo 0 > "$SUCCESS_FILE"
+[ -f "$FAILURE_FILE" ] || echo 0 > "$FAILURE_FILE"
 
 # =========================
 # 通知関数
@@ -115,6 +122,29 @@ notify() {
         return 1
     fi
 }
+
+# =========================
+# エラー検知
+# =========================
+
+trap '
+EXIT_CODE=$?
+echo "ERR trap called"
+
+FAILURE_COUNT=$(cat "$FAILURE_FILE")
+FAILURE_COUNT=$((FAILURE_COUNT + 1))
+echo "$FAILURE_COUNT" > "$FAILURE_FILE"
+
+{
+    echo "restore_success_total $(cat "$SUCCESS_FILE")"
+    echo "restore_failure_total $FAILURE_COUNT"
+    echo "restore_last_timestamp $(date +%s)"
+} > "$METRIC_FILE"
+
+log_error "Restore failed (exit code=$EXIT_CODE)"
+notify "❌ Restore failed"
+exit "$EXIT_CODE"
+' ERR
 
 # =========================
 # dry-run
@@ -148,7 +178,7 @@ if [ -n "$TARGET_BACKUP" ]; then
 
     if [[ "$TARGET_BACKUP" == */* ]]; then
         log_error "Invalid backup name"
-        exit 1
+        false
     fi
 
     LATEST="$BACKUP_DIR/$TARGET_BACKUP"
@@ -169,20 +199,17 @@ fi
 
 if [ -z "${LATEST:-}" ] || [ ! -f "$LATEST" ]; then
     log_error "No backup found"
-    notify "❌ Restore failed: no backup"
-    exit 1
+    false
 fi
 
 if [[ ! "$LATEST" == "$BACKUP_DIR"/* ]]; then
     log_error "ERROR: Path outside backup directory"
-    notify "❌ Restore blocked: invalid path"
-    exit 1
+    false
 fi
 
 if [ ! -s "$LATEST" ]; then
     log_error "Invalid backup: $LATEST"
-    notify "❌ Restore failed: invalid backup"
-    exit 1
+    false
 fi
 
 # =========================
@@ -209,13 +236,11 @@ if [[ "$FILE_NAME" =~ $REGEX ]]; then
 
     if [ "$AGE" -gt "$MAX_AGE_SEC" ]; then
         log_warn "Backup too old: $LATEST"
-        notify "⚠️ Restore blocked: backup too old"
-        exit 1
+        false
     fi
 else
     log_error "Invalid backup filename format: $FILE_NAME"
-    notify "❌ Restore blocked: invalid backup filename format"
-    exit 1
+    false
 fi
 
 # =========================
@@ -255,7 +280,7 @@ if [ "$FORCE" != "true" ]; then
     if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
         log_info "Restore cancelled"
         notify "⚠️ Restore cancelled"
-        exit 0
+        false
     fi
 fi
 
@@ -289,7 +314,7 @@ if [ "$RESTORED_HASH" != "$BACKUP_HASH" ]; then
         log_warn "Rollback skipped: rollback file does not exist"
     fi
     notify "❌ Restore failed: rollback executed"
-    exit 1
+    false
 fi
 
 # =========================
@@ -327,6 +352,18 @@ else
 fi
 log_info "Restore file size: $FILE_SIZE bytes"
 log_info "Restore completed: $(basename "$LATEST")"
+SUCCESS_COUNT=$(cat "$SUCCESS_FILE")
+SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+echo "$SUCCESS_COUNT" > "$SUCCESS_FILE"
+
+FAILURE_COUNT=$(cat "$FAILURE_FILE")
+
+{
+    echo "restore_success_total $SUCCESS_COUNT"
+    echo "restore_failure_total $FAILURE_COUNT"
+    echo "restore_last_timestamp $(date +%s)"
+} > "$METRIC_FILE"
+
 notify "♻️ Restore completed: $(basename "$LATEST")"
 
 exit 0
