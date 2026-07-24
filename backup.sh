@@ -30,6 +30,9 @@ WEBHOOK_URL="${WEBHOOK_URL:-}"
 SLACK_ENABLED=0
 [[ -n "$WEBHOOK_URL" ]] && SLACK_ENABLED=1
 
+log_info "SLACK_ENABLED=$SLACK_ENABLED"
+log_info "WEBHOOK_URL length=${#WEBHOOK_URL}"
+
 DRY_RUN="${DRY_RUN:-false}"
 
 # 世代管理数
@@ -44,11 +47,20 @@ notify() {
 
     [[ "$SLACK_ENABLED" -eq 0 ]] && return 0
 
-    if ! curl -s -X POST \
-        -H "Content-type: application/json" \
-        --data "$(jq -n --arg text "$message" '{text:$text}')" \
-        "$WEBHOOK_URL" >/dev/null 2>>"$LOG_FILE"; then
-        log_warn "Slack notification failed"
+    HTTP_CODE=$(
+        curl -s \
+            -o /dev/null \
+            -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data "$(jq -n --arg text "$message" '{text:$text}')" \
+            "$WEBHOOK_URL"
+    )
+
+    if [[ "$HTTP_CODE" != "200" ]]; then
+        log_warn "Slack notification failed (HTTP $HTTP_CODE)"
+    else
+        log_info "Slack notification sent"
     fi
 }
 
@@ -131,8 +143,12 @@ for TARGET in "${TARGETS[@]}"; do
     NAME="${TARGET%.*}"
     EXT="${TARGET##*.}"
 
-    mapfile -t files < <(
-        ls -1t "$BACKUP_DIR"/"${NAME}"_*."${EXT}" 2>/dev/null
+    files=()
+
+    while IFS= read -r file; do
+       files+=("$file")
+    done < <(
+      ls -1t "$BACKUP_DIR"/"${NAME}"_*."${EXT}" 2>/dev/null
     )
 
     if [ "${#files[@]}" -gt "$KEEP_BACKUPS" ]; then
